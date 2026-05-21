@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stack Ball</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            background-color: #050508;
+            color: #ffffff;
+            font-family: 'Montserrat', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        #game-container {
+            position: relative;
+            width: 100%;
+            max-width: 420px;
+            height: 660px;
+            background: #0d0d14;
+            border: 3px solid #ff7300;
+            border-radius: 20px;
+            box-shadow: 0 0 35px rgba(255, 115, 0, 0.3);
+        }
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            border-radius: 16px;
+            background: radial-gradient(circle, #141524 0%, #07080c 100%);
+        }
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 20px;
+            font-size: 14px;
+            font-weight: 800;
+            pointer-events: none;
+            letter-spacing: 1px;
+            z-index: 5;
+        }
+        .orange-text {
+            color: #ff9f00;
+            text-shadow: 0 0 12px rgba(255, 159, 0, 0.6);
+        }
+        .best-text {
+            color: #39ff14;
+            text-shadow: 0 0 12px rgba(57, 255, 20, 0.6);
+        }
+        #fever-bar-container {
+            position: absolute;
+            bottom: 25px;
+            left: 10%;
+            width: 80%;
+            height: 14px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 7px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            pointer-events: none;
+            z-index: 5;
+        }
+        #fever-bar {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #ffcc00, #ff3300);
+            box-shadow: 0 0 15px #ff3300;
+            transition: width 0.08s ease;
+        }
+        #screen-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(6, 6, 10, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 24px;
+            border-radius: 16px;
+            z-index: 10;
+            backdrop-filter: blur(6px);
+            transition: all 0.3s ease;
+        }
+        .game-title {
+            font-size: 42px;
+            font-weight: 900;
+            color: #ffffff;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 0 0 20px rgba(255, 115, 0, 0.5);
+        }
+        .game-subtitle {
+            font-size: 16px;
+            font-weight: 700;
+            color: #ff7300;
+            margin-bottom: 30px;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+        }
+        .btn-play {
+            background: linear-gradient(135deg, #ff8800 0%, #ff2200 100%);
+            color: white;
+            border: none;
+            padding: 16px 50px;
+            font-size: 20px;
+            font-weight: 900;
+            border-radius: 40px;
+            cursor: pointer;
+            box-shadow: 0 0 25px rgba(255, 34, 0, 0.6);
+            transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            animation: pulseGlow 1.8s infinite;
+            margin-top: 15px;
+        }
+        .btn-play:active {
+            transform: scale(0.92);
+        }
+        @keyframes pulseGlow {
+            0% { transform: scale(1); box-shadow: 0 0 20px rgba(255, 34, 0, 0.5); }
+            50% { transform: scale(1.05); box-shadow: 0 0 35px rgba(255, 34, 0, 0.8); }
+            100% { transform: scale(1); box-shadow: 0 0 20px rgba(255, 34, 0, 0.5); }
+        }
+        .score-info {
+            color: #a0a0b5;
+            font-size: 15px;
+            margin-bottom: 15px;
+            font-weight: 600;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="ui-layer">
+            <div>SCORE: <span id="score-val" class="orange-text">0</span></div>
+            <div>BEST: <span id="highscore-val" class="best-text">0</span></div>
+            <div>LEVEL: <span id="level-val" class="orange-text">1</span></div>
+        </div>
+
+        <div id="fever-bar-container">
+            <div id="fever-bar"></div>
+        </div>
+
+        <canvas id="gameCanvas" width="400" height="660"></canvas>
+
+        <div id="screen-overlay">
+            <h1 class="game-title" id="status-title">Stack Ball</h1>
+            <div class="game-subtitle" id="status-subtitle">Stack Ball</div>
+            <p class="score-info" id="status-desc">Smash through glowing platforms.<br>Catch the highly valued Oranges!</p>
+            <button id="action-btn" class="btn-play" onclick="handleMenuAction()">PLAY NOW</button>
+        </div>
+    </div>
+
+    <script type="module">
+        // ==========================================
+        // ORANGE WEB3 SERVER CREDENTIALS
+        // ==========================================
+        const TENANT_CODE = "orangeid-5W2sQze4Md"; // Project ID
+        const API_KEY = "73142900d1b4453cab548dba24828144"; // Server API Key
+        // ==========================================
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let score = 0;
+        let highScore = localStorage.getItem('stackball_record_highscore') || 0;
+        let currentLevel = 1;
+        let gameActive = false;
+        
+        let shakeDuration = 0;
+        let shakeMagnitude = 0;
+
+        let ball = { 
+            x: 200, 
+            y: 120, 
+            radius: 11, 
+            vy: 0, 
+            isSmashing: false, 
+            baseBounce: -6.8,
+            feverMeter: 0,
+            inFeverMode: false,
+            trail: []
+        };
+        
+        let platforms = [];
+        let particles = [];
+        let popups = []; 
+        let TOTAL_PLATFORMS = 30; 
+        let currentPlatformIndex = 0;
+        let cameraY = 0;
+
+        const NEON_PALETTE = ["#00f0ff", "#ff007c", "#39ff14", "#bc00ff", "#ffff00", "#00ffcc"];
+
+        document.getElementById('highscore-val').innerText = highScore;
+
+        // Module Connection for Web3
+        let BedrockPassport;
+        try {
+            const bedrock = await import('@bedrock'); 
+            BedrockPassport = bedrock.BedrockPassport; 
+        } catch(e) {
+            console.warn("Module local load failed. Will use fallback for offline testing.");
+        }
+
+        // Action Button: Trigger Server Connection
+        window.handleMenuAction = async function() {
+            const desc = document.getElementById('status-desc');
+            const btn = document.getElementById('action-btn');
+
+            desc.innerText = "Connecting to Orange Web3 Server...";
+            btn.style.display = "none";
+
+            try {
+                if (BedrockPassport) {
+                    const passport = new BedrockPassport({ tenantCode: TENANT_CODE }); 
+                    await passport.authenticate(); 
+                }
+                await processGamePassSequence();
+            } catch (error) {
+                console.warn("Server connection failed or running locally. Using local fallback mode.");
+                launchActiveSession(); // Fallback for your local phone testing
+            }
+        }
+
+        // API Call to Orange Web3 Server
+        async function processGamePassSequence() {
+            const params = new URLSearchParams(window.location.search); 
+            let token = params.get("pass_token"); 
+
+            if (token) {
+                sessionStorage.setItem("game_pass_token", token); 
+                window.history.replaceState({}, document.title, window.location.pathname); 
+            } else {
+                token = sessionStorage.getItem("game_pass_token"); 
+            }
+
+            if (!token) throw new Error("No Token Found - Trigger Local Bypass");
+
+            // Server Fetch Call with API KEY included
+            const response = await fetch("https://app.orangeweb3.com/api/games/passes/redeem", { 
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${token}`, 
+                    "Content-Type": "application/json",
+                    "x-api-key": API_KEY // <--- API KEY ADDED HERE FOR SECURE SERVER AUTHENTICATION
+                },
+                body: JSON.stringify({ tenant_code: TENANT_CODE }) 
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.status === "ACTIVE") { 
+                    launchActiveSession(); 
+                } else {
+                    alert("Your game session has expired.");
+                    resetMenuToDefault();
+                }
+            } else {
+                console.warn("API returned error, running fallback simulation.");
+                launchActiveSession(); 
+            }
+        }
+
+        function resetMenuToDefault() {
+            document.getElementById('screen-overlay').style.display = 'flex';
+            document.getElementById('status-title').innerText = "Stack Ball";
+            document.getElementById('status-subtitle').innerText = "Stack Ball";
+            document.getElementById('status-desc').innerHTML = "Smash through glowing platforms.<br>Catch the highly valued Oranges!";
+            const btn = document.getElementById('action-btn');
+            btn.innerText = "PLAY NOW";
+            btn.style.display = "block";
+        }
+
+        class ScorePopup {
+            constructor(x, y, text, color) {
+                this.x = x;
+                this.y = y;
+                this.text = text;
+                this.color = color;
+                this.alpha = 1;
+                this.vy = -2;
+            }
+            update() {
+                this.y += this.vy;
+                this.alpha -= 0.025;
+            }
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                ctx.fillStyle = this.color;
+                ctx.font = "bold 18px Montserrat";
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = this.color;
+                ctx.textAlign = "center";
+                ctx.fillText(this.text, this.x, this.y);
+                ctx.restore();
+            }
+        }
+
+        class BurstParticle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.vx = (Math.random() - 0.5) * 14;
+                this.vy = (Math.random() - 0.7) * 16;
+                this.radius = Math.random() * 4 + 3;
+                this.alpha = 1;
+                this.color = color;
+                this.gravity = 0.45;
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vy += this.gravity;
+                this.alpha -= 0.035;
+            }
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = this.color;
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        function triggerScreenShake(duration, magnitude) {
+            shakeDuration = duration;
+            shakeMagnitude = magnitude;
+        }
+
+        window.launchActiveSession = function() {
+            document.getElementById('screen-overlay').style.display = 'none';
+            gameActive = true;
+            currentPlatformIndex = 0;
+            cameraY = 0;
+            particles = [];
+            popups = [];
+            
+            ball.y = 120;
+            ball.vy = 0;
+            ball.feverMeter = 0;
+            ball.inFeverMode = false;
+            ball.isSmashing = false;
+            ball.trail = [];
+            
+            document.getElementById('score-val').innerText = score;
+            document.getElementById('level-val').innerText = currentLevel;
+            document.getElementById('highscore-val').innerText = highScore;
+            document.getElementById('fever-bar').style.width = "0%";
+            
+            TOTAL_PLATFORMS = 25 + (currentLevel * 5); 
+            buildTowerGeometry();
+            
+            runGraphicsPipeline();
+        }
+
+        function buildTowerGeometry() {
+            platforms = [];
+            let currentHeightPointer = 280;
+            
+            let baseObstacleChance = 0.12 + (currentLevel * 0.04);
+            if (baseObstacleChance > 0.48) baseObstacleChance = 0.48;
+
+            let baseSpeed = 0.014 + (currentLevel * 0.003);
+            if (baseSpeed > 0.038) baseSpeed = 0.038;
+
+            for (let i = 0; i < TOTAL_PLATFORMS; i++) {
+                let segmentsList = [];
+                let slicesCount = 8; 
+                let layerThemeColor = NEON_PALETTE[i % NEON_PALETTE.length];
+                
+                for (let s = 0; s < slicesCount; s++) {
+                    let typeRoll = Math.random();
+                    let classDesignation = "normal";
+                    
+                    if (currentLevel === 1 && i < 3) {
+                        typeRoll = 0.5; 
+                    }
+
+                    if (typeRoll < baseObstacleChance && s !== 0) { 
+                        classDesignation = "obstacle"; 
+                    } else if (typeRoll > 0.80) {
+                        classDesignation = "orange"; 
+                    }
+                    
+                    segmentsList.push({
+                        type: classDesignation,
+                        startAngle: (s * Math.PI * 2) / slicesCount,
+                        endAngle: ((s + 1) * Math.PI * 2) / slicesCount,
+                        color: layerThemeColor
+                    });
+                }
+                
+                platforms.push({
+                    y: currentHeightPointer,
+                    rotation: Math.random() * Math.PI,
+                    rotSpeed: (Math.random() > 0.5 ? 1 : -1) * (baseSpeed + Math.random() * 0.005), 
+                    segments: segmentsList,
+                    broken: false
+                });
+                currentHeightPointer += 135; 
+            }
+        }
+
+        window.addEventListener('mousedown', () => { if(gameActive) ball.isSmashing = true; });
+        window.addEventListener('mouseup', () => { if(gameActive) ball.isSmashing = false; });
+        window.addEventListener('touchstart', (e) => { if(gameActive) { ball.isSmashing = true; e.preventDefault(); } }, {passive: false});
+        window.addEventListener('touchend', () => { if(gameActive) ball.isSmashing = false; });
+
+        function createExplosionBurst(yPos, colorHex) {
+            for (let i = 0; i < 22; i++) {
+                particles.push(new BurstParticle(canvas.width / 2 + (Math.random() - 0.5) * 120, yPos, colorHex));
+            }
+        }
+
+        function normalizeAngle(a) {
+            a = a % (Math.PI * 2);
+            if (a < 0) a += Math.PI * 2;
+            return a;
+        }
+
+        function runGraphicsPipeline() {
+            if (!gameActive) return;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            let idealCameraTarget = platforms[currentPlatformIndex].y - 220;
+            cameraY += (idealCameraTarget - cameraY) * 0.15;
+
+            let currentShakeX = 0;
+            let currentShakeY = 0;
+            if (shakeDuration > 0) {
+                currentShakeX = (Math.random() - 0.5) * shakeMagnitude;
+                currentShakeY = (Math.random() - 0.5) * shakeMagnitude;
+                shakeDuration--;
+            }
+
+            ctx.save();
+            ctx.translate(currentShakeX, -cameraY + currentShakeY);
+
+            ctx.fillStyle = "#14141f";
+            ctx.fillRect(canvas.width / 2 - 16, cameraY - 100, 32, canvas.height + 200);
+
+            platforms.forEach((plat) => {
+                if (plat.broken) return;
+
+                plat.rotation += plat.rotSpeed;
+
+                plat.segments.forEach(seg => {
+                    const gap = 0.08; 
+                    const start = seg.startAngle + plat.rotation + (gap/2);
+                    const end = seg.endAngle + plat.rotation - (gap/2);
+                    
+                    if (start >= end) return;
+
+                    ctx.beginPath();
+                    ctx.arc(canvas.width / 2, plat.y + 6, 68, start, end);
+                    ctx.lineWidth = 16;
+                    ctx.lineCap = "round";
+                    ctx.strokeStyle = "rgba(0, 0, 0, 0.6)"; 
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.arc(canvas.width / 2, plat.y, 68, start, end);
+                    ctx.lineWidth = 16;
+                    ctx.lineCap = "round";
+                    
+                    if (seg.type === "obstacle") {
+                        ctx.strokeStyle = "#111116"; 
+                        ctx.shadowBlur = 0;
+                    } else if (seg.type === "orange") {
+                        ctx.strokeStyle = "#ff7300"; 
+                        ctx.shadowColor = "#ff7300";
+                        ctx.shadowBlur = 15; 
+                    } else {
+                        ctx.strokeStyle = seg.color; 
+                        ctx.shadowColor = seg.color;
+                        ctx.shadowBlur = 12; 
+                    }
+                    ctx.stroke();
+                    ctx.shadowBlur = 0; 
+                });
+            });
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                particles[i].update();
+                particles[i].draw();
+                if (particles[i].alpha <= 0) particles.splice(i, 1);
+            }
+
+            for (let i = popups.length - 1; i >= 0; i--) {
+                popups[i].update();
+                popups[i].draw();
+                if (popups[i].alpha <= 0) popups.splice(i, 1);
+            }
+
+            if (ball.isSmashing) {
+                ball.vy = ball.inFeverMode ? 19 : 14;
+                ball.trail.push({ x: ball.x, y: ball.y });
+                if (ball.trail.length > 10) ball.trail.shift();
+            } else {
+                ball.vy += 0.44; 
+                if (ball.trail.length > 0) ball.trail.shift();
+            }
+            ball.y += ball.vy;
+
+            if (ball.trail.length > 0) {
+                ctx.save();
+                ball.trail.forEach((t, index) => {
+                    ctx.beginPath();
+                    ctx.arc(t.x, t.y, ball.radius * (index / ball.trail.length), 0, Math.PI * 2);
+                    ctx.fillStyle = ball.inFeverMode ? `rgba(255, 50, 0, ${index * 0.12})` : `rgba(255, 140, 0, ${index * 0.08})`;
+                    ctx.fill();
+                });
+                ctx.restore();
+            }
+
+            if (ball.isSmashing && !ball.inFeverMode) {
+                ball.feverMeter = Math.min(100, ball.feverMeter + 1.1);
+                if (ball.feverMeter >= 100) ball.inFeverMode = true;
+            } else if (!ball.isSmashing && !ball.inFeverMode) {
+                ball.feverMeter = Math.max(0, ball.feverMeter - 0.7);
+            } else if (ball.inFeverMode) {
+                ball.feverMeter -= 0.7;
+                if (ball.feverMeter <= 0) ball.inFeverMode = false;
+            }
+            document.getElementById('fever-bar').style.width = `${ball.feverMeter}%`;
+
+            let directTargetRing = platforms[currentPlatformIndex];
+
+            if (ball.y >= directTargetRing.y - ball.radius && ball.y <= directTargetRing.y + 14) {
+                
+                let targetWorldAngle = -Math.PI / 2;
+                let primaryHitSegment = null;
+                let tAngle = normalizeAngle(targetWorldAngle);
+
+                for (let seg of directTargetRing.segments) {
+                    let sAngle = normalizeAngle(seg.startAngle + directTargetRing.rotation);
+                    let eAngle = normalizeAngle(seg.endAngle + directTargetRing.rotation);
+                    
+                    if (sAngle < eAngle) {
+                        if (tAngle >= sAngle && tAngle <= eAngle) {
+                            primaryHitSegment = seg;
+                            break;
+                        }
+                    } else { 
+                        if (tAngle >= sAngle || tAngle <= eAngle) {
+                            primaryHitSegment = seg;
+                            break;
+                        }
+                    }
+                }
+
+                if (!primaryHitSegment) primaryHitSegment = directTargetRing.segments[0];
+
+                if (ball.isSmashing) {
+                    if (primaryHitSegment.type === "obstacle" && !ball.inFeverMode) {
+                        createExplosionBurst(directTargetRing.y, "#ff3333");
+                        triggerScreenShake(15, 10);
+                        terminateActiveSession(false, "Smashed into a black obstacle!");
+                    } else {
+                        let targetColorHex = primaryHitSegment.type === "orange" ? "#ff7300" : primaryHitSegment.type === "obstacle" ? "#444" : primaryHitSegment.color;
+                        createExplosionBurst(directTargetRing.y, targetColorHex);
+                        
+                        if (primaryHitSegment.type === "orange") {
+                            score += 50; 
+                            popups.push(new ScorePopup(ball.x, ball.y - 15, "+50 ORANGE!", "#ff7300"));
+                            triggerScreenShake(10, 7);
+                        } else {
+                            score += 10; 
+                            popups.push(new ScorePopup(ball.x + (Math.random()-0.5)*40, ball.y - 15, "+10", primaryHitSegment.color));
+                            triggerScreenShake(6, 4);
+                        }
+                        
+                        if (score > highScore) {
+                            highScore = score;
+                            localStorage.setItem('stackball_record_highscore', highScore);
+                            document.getElementById('highscore-val').innerText = highScore;
+                        }
+
+                        directTargetRing.broken = true;
+                        advanceRingTierIndex();
+                    }
+                } else {
+                    ball.y = directTargetRing.y - ball.radius;
+                    ball.vy = ball.baseBounce;
+                    triggerScreenShake(2, 1);
+                }
+            }
+
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            if (ball.inFeverMode) {
+                ctx.fillStyle = "#ff2200";
+                ctx.shadowBlur = 25;
+                ctx.shadowColor = "#ff7300";
+            } else {
+                ctx.fillStyle = ball.isSmashing ? "#ffaa00" : "#ffffff";
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = "#ffffff";
+            }
+            ctx.fill();
+            ctx.shadowBlur = 0; 
+            ctx.closePath();
+            ctx.restore();
+
+            document.getElementById('score-val').innerText = score;
+            requestAnimationFrame(runGraphicsPipeline);
+        }
+
+        function advanceRingTierIndex() {
+            currentPlatformIndex++;
+            ball.vy = 2.5; 
+            
+            if (currentPlatformIndex >= platforms.length) {
+                terminateActiveSession(true, "LEVEL COMPLETED!");
+            }
+        }
+
+        function terminateActiveSession(isWinState, outcomeReasonMessage) {
+            gameActive = false;
+            
+            const overlay = document.getElementById('screen-overlay');
+            const title = document.getElementById('status-title');
+            const subtitle = document.getElementById('status-subtitle');
+            const desc = document.getElementById('status-desc');
+            const btn = document.getElementById('action-btn');
+
+            overlay.style.display = 'flex';
+            
+            if (isWinState) {
+                title.innerText = "LEVEL CLEAR";
+                subtitle.innerText = "Stack Ball"; 
+                desc.innerHTML = `Awesome! You cleared Level ${currentLevel}.<br>Current High Score Record: <b>${highScore}</b>`;
+                btn.innerText = "NEXT LEVEL";
+                btn.style.display = "block";
+                btn.setAttribute("onclick", "advanceToNextLevel()");
+            } else {
+                title.innerText = "Stack Ball"; 
+                subtitle.innerText = "GAME OVER"; 
+                desc.innerHTML = `${outcomeReasonMessage}<br><br>Final Score: <b>${score}</b><br>Your Best Record: <b>${highScore}</b>`;
+                btn.innerText = "PLAY AGAIN";
+                btn.style.display = "block";
+                btn.setAttribute("onclick", "restartCurrentLevel()");
+            }
+        }
+
+        window.advanceToNextLevel = function() {
+            currentLevel++;
+            launchActiveSession();
+        }
+
+        window.restartCurrentLevel = function() {
+            score = 0; 
+            launchActiveSession();
+        }
+    </script>
+</body>
+</html>
